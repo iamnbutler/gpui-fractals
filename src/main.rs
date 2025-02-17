@@ -16,10 +16,9 @@ struct FractalViewer {
 
 impl FractalViewer {
     fn new(cx: &mut Context<Self>) -> Self {
-        let size = 50.0;
+        let size = 64.0;
         let fractal = Self::create_fractal(size);
 
-        // Set up a timer to grow the fractal
         cx.spawn(|this, mut cx| async move {
             loop {
                 Timer::after(Duration::from_millis(8)).await;
@@ -40,9 +39,9 @@ impl FractalViewer {
     }
 
     fn grow(&mut self, cx: &mut Context<Self>) {
-        self.size += 1.0; // Increase size by 0.5 pixels each frame
+        self.size += 1.0;
         if self.size > 1024.0 {
-            self.size = 8.0; // Reset size when it gets too large
+            self.size = 8.0;
         }
         self.fractal = Self::create_fractal(self.size);
         cx.notify();

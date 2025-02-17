@@ -1,7 +1,8 @@
+#![allow(dead_code)]
+
 use gpui::{point, px, Path, PathBuilder, Pixels, Point};
 use std::f32::consts::PI;
 
-// Helper functions for drawing basic shapes
 mod shapes {
     use super::*;
 
@@ -44,7 +45,6 @@ mod shapes {
     }
 }
 
-// Dragon Curve
 pub mod dragon {
     use super::*;
 
@@ -80,7 +80,6 @@ pub mod dragon {
     }
 }
 
-// Koch Snowflake
 pub mod koch {
     use super::*;
 
@@ -138,7 +137,6 @@ pub mod koch {
     }
 }
 
-// Sierpinski Triangle
 pub mod sierpinski {
     use super::*;
 
@@ -183,7 +181,6 @@ pub mod sierpinski {
     }
 }
 
-// Pythagoras Tree
 pub mod pythagoras {
     use super::*;
 
@@ -225,7 +222,6 @@ pub mod pythagoras {
     }
 }
 
-// Circular Sierpinski Carpet
 pub mod circular_sierpinski {
     use super::*;
 
@@ -256,7 +252,6 @@ pub mod circular_sierpinski {
         let inner_radius = radius * 1.0 / 3.0;
         let offset = radius * 2.0 / 3.0;
 
-        // Draw inner circles
         for i in 0..8 {
             let angle = i as f32 * PI / 4.0;
             let x = center.x + px(offset.0 * angle.cos());
@@ -270,7 +265,6 @@ pub mod circular_sierpinski {
             );
         }
 
-        // Draw center circle
         recursive(builder, center, inner_radius, depth - 1, circle_segments);
     }
 }
