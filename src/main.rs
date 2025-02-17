@@ -1,6 +1,8 @@
+use std::time::Duration;
+
 use gpui::{
     canvas, div, point, prelude::*, px, Application, Bounds, Context, Path, PathBuilder, Pixels,
-    Render, Size, TitlebarOptions, Window, WindowOptions,
+    Render, Size, Timer, TitlebarOptions, Window, WindowOptions,
 };
 
 mod fractals;
@@ -9,16 +11,41 @@ use fractals::*;
 
 struct FractalViewer {
     fractal: Path<Pixels>,
+    size: f32,
 }
 
 impl FractalViewer {
-    fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
-        let center = point(px(400.), px(300.));
-        let radius = px(200.);
-        let depth = 5;
-        let fractal = circular_sierpinski::carpet(point(px(256.), px(256.)), px(200.), 4, 32)
-            .unwrap_or_else(|| PathBuilder::stroke(px(1.)).build().unwrap());
-        Self { fractal }
+    fn new(cx: &mut Context<Self>) -> Self {
+        let size = 50.0;
+        let fractal = Self::create_fractal(size);
+
+        // Set up a timer to grow the fractal
+        cx.spawn(|this, mut cx| async move {
+            loop {
+                Timer::after(Duration::from_millis(8)).await;
+                this.update(&mut cx, |this, cx| {
+                    this.grow(cx);
+                })
+                .ok();
+            }
+        })
+        .detach();
+
+        Self { fractal, size }
+    }
+
+    fn create_fractal(size: f32) -> Path<Pixels> {
+        circular_sierpinski::carpet(point(px(256.), px(256.)), px(size), 4, 32)
+            .unwrap_or_else(|| PathBuilder::stroke(px(1.)).build().unwrap())
+    }
+
+    fn grow(&mut self, cx: &mut Context<Self>) {
+        self.size += 1.0; // Increase size by 0.5 pixels each frame
+        if self.size > 1024.0 {
+            self.size = 8.0; // Reset size when it gets too large
+        }
+        self.fractal = Self::create_fractal(self.size);
+        cx.notify();
     }
 }
 
@@ -53,7 +80,7 @@ fn main() {
                 focus: true,
                 ..Default::default()
             },
-            |window, cx| cx.new(|cx| FractalViewer::new(window, cx)),
+            |_, cx| cx.new(|cx| FractalViewer::new(cx)),
         )
         .unwrap();
         cx.activate(true);
