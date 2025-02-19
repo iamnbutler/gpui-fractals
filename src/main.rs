@@ -29,12 +29,10 @@ fn render_canvas(
 struct FractalViewer {
     quads: Vec<gpui::PaintQuad>,
     paths: Vec<(gpui::Path<Pixels>, gpui::Hsla)>,
-    c: Complex<f32>,
 }
 
 impl FractalViewer {
     fn new(_cx: &mut Context<Self>) -> Self {
-        let c = Complex::new(-0.4, 0.6);
         let quads = vec![
             fractals::shapes::circle(px(50.0), point(px(100.0), px(100.0))).quad(),
             fractals::shapes::pixel(point(px(200.0), px(200.0)))
@@ -52,7 +50,7 @@ impl FractalViewer {
         ];
         // let paths = fractals::pythagoras::tree(point(px(128.), px(128.)), 128., 0., 8);
 
-        Self { quads, paths, c }
+        Self { quads, paths }
     }
 
     // fn create_fractal(c: Complex<f32>) -> Vec<gpui::PaintQuad> {

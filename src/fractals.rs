@@ -4,13 +4,20 @@ use gpui::{point, px, Path, Pixels, Point};
 use std::f32::consts::PI;
 
 pub mod shapes {
-    use gpui::{Bounds, Corners, Edges, Hsla, Size, Window};
+    use gpui::{Background, Bounds, Corners, Edges, Hsla, Size};
 
     use super::*;
 
     pub struct Stroke {
         width: Pixels,
         color: gpui::Hsla,
+    }
+
+    pub struct ShapeProperties {
+        fill: Background,
+        position: Point<Pixels>,
+        size: Pixels,
+        stroke: Stroke,
     }
 
     impl From<Hsla> for Stroke {
