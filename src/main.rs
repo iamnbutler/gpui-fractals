@@ -1,23 +1,39 @@
 use std::time::Duration;
 
 use gpui::{
-    canvas, div, point, prelude::*, px, Application, Bounds, Context, Path, PathBuilder, Pixels,
-    Render, Size, Timer, TitlebarOptions, Window, WindowOptions,
+    canvas, div, point, prelude::*, px, App, Application, Bounds, Context, Path, PathBuilder,
+    Pixels, Render, Size, Timer, TitlebarOptions, Window, WindowOptions,
 };
 
 mod fractals;
 
 use fractals::*;
 
+fn render_fractal(
+    quads: Vec<gpui::PaintQuad>,
+    _window: &mut Window,
+    _cx: &mut App,
+) -> impl IntoElement {
+    canvas(
+        |_, _, _| {},
+        move |_, _, window, _| {
+            for quad in quads.iter() {
+                window.paint_quad(quad.clone());
+            }
+        },
+    )
+    .size_full()
+}
+
 struct FractalViewer {
-    fractal: Path<Pixels>,
+    quads: Vec<gpui::PaintQuad>,
     size: f32,
 }
 
 impl FractalViewer {
     fn new(cx: &mut Context<Self>) -> Self {
         let size = 64.0;
-        let fractal = Self::create_fractal(size);
+        let quads = Self::create_fractal(size);
 
         cx.spawn(|this, mut cx| async move {
             loop {
@@ -30,12 +46,11 @@ impl FractalViewer {
         })
         .detach();
 
-        Self { fractal, size }
+        Self { quads, size }
     }
 
-    fn create_fractal(size: f32) -> Path<Pixels> {
-        circular_sierpinski::carpet(point(px(256.), px(256.)), px(size), 4, 32)
-            .unwrap_or_else(|| PathBuilder::stroke(px(1.)).build().unwrap())
+    fn create_fractal(size: f32) -> Vec<gpui::PaintQuad> {
+        circular_sierpinski2::carpet(point(px(256.), px(256.)), px(size), 4)
     }
 
     fn grow(&mut self, cx: &mut Context<Self>) {
@@ -43,24 +58,19 @@ impl FractalViewer {
         if self.size > 1024.0 {
             self.size = 8.0;
         }
-        self.fractal = Self::create_fractal(self.size);
+        self.quads = Self::create_fractal(self.size);
         cx.notify();
     }
 }
 
 impl Render for FractalViewer {
-    fn render(&mut self, _: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let fractal = self.fractal.clone();
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let quads = self.quads.clone();
 
-        div().bg(gpui::black()).size_full().child(
-            canvas(
-                move |_, _, _| {},
-                move |_, _, window, _| {
-                    window.paint_path(fractal, gpui::white());
-                },
-            )
-            .size_full(),
-        )
+        div()
+            .bg(gpui::white())
+            .size_full()
+            .child(render_fractal(quads, window, cx))
     }
 }
 

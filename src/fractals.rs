@@ -3,6 +3,134 @@
 use gpui::{point, px, Path, PathBuilder, Pixels, Point};
 use std::f32::consts::PI;
 
+mod shapes2 {
+    use gpui::{Bounds, Corners, Edges, Hsla, Size};
+
+    use super::*;
+
+    pub struct Stroke {
+        width: Pixels,
+        color: gpui::Hsla,
+    }
+
+    impl From<Hsla> for Stroke {
+        fn from(color: Hsla) -> Self {
+            Stroke {
+                width: px(1.),
+                color,
+            }
+        }
+    }
+
+    pub fn circle(radius: impl Into<Pixels>, position: Point<Pixels>) -> Circle {
+        Circle::new(radius.into(), position)
+    }
+
+    pub struct Circle {
+        fill: gpui::Background,
+        position: Point<Pixels>,
+        size: Pixels,
+        stroke: Stroke,
+    }
+
+    impl Circle {
+        pub fn new(radius: Pixels, position: Point<Pixels>) -> Self {
+            let stroke: Stroke = gpui::black().into();
+            let fill: gpui::Background = gpui::transparent_black().into();
+
+            Circle {
+                stroke,
+                fill,
+                size: radius * 2.0,
+                position,
+            }
+        }
+
+        pub fn stroke_width(mut self, width: impl Into<Pixels>) -> Self {
+            self.stroke.width = width.into();
+            self
+        }
+
+        pub fn stroke_color(mut self, color: impl Into<gpui::Hsla>) -> Self {
+            self.stroke.color = color.into();
+            self
+        }
+
+        pub fn fill(mut self, fill: impl Into<gpui::Background>) -> Self {
+            self.fill = fill.into();
+            self
+        }
+
+        pub fn no_stroke(mut self) -> Self {
+            self.stroke = Stroke {
+                width: px(0.),
+                color: gpui::transparent_black(),
+            };
+            self
+        }
+
+        pub fn quad(&self) -> gpui::PaintQuad {
+            let half_size = self.size / 2.0;
+            let center = point(self.position.x + half_size, self.position.y + half_size);
+
+            let bounds = Bounds::centered_at(
+                center,
+                Size {
+                    width: self.size,
+                    height: self.size,
+                },
+            );
+            let background = self.fill;
+            let border_color = self.stroke.color;
+            let border_width = self.stroke.width;
+
+            gpui::PaintQuad {
+                bounds,
+                corner_radii: Corners::all(px(2.)),
+                background,
+                border_widths: Edges::all(border_width),
+                border_color,
+            }
+        }
+    }
+}
+
+pub mod circular_sierpinski2 {
+    use super::*;
+
+    pub fn carpet(center: Point<Pixels>, radius: Pixels, depth: u32) -> Vec<gpui::PaintQuad> {
+        recursive(center, radius, depth)
+    }
+
+    fn recursive(center: Point<Pixels>, radius: Pixels, depth: u32) -> Vec<gpui::PaintQuad> {
+        let mut quads = Vec::new();
+
+        if depth == 0 {
+            return quads;
+        }
+
+        quads.push(
+            shapes2::circle(radius, center)
+                .fill(gpui::red().opacity(0.2))
+                .quad(),
+        );
+
+        let inner_radius = radius * 1.0 / 3.0;
+        let offset = radius * 2.0 / 3.0;
+
+        for i in 0..8 {
+            let angle = i as f32 * PI / 4.0;
+            let x = center.x + px(offset.0 * angle.cos());
+            let y = center.y + px(offset.0 * angle.sin());
+            quads.extend(recursive(Point { x, y }, inner_radius, depth - 1));
+        }
+
+        quads.extend(recursive(center, inner_radius, depth - 1));
+
+        quads
+    }
+}
+
 mod shapes {
     use super::*;
 
