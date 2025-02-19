@@ -33,7 +33,7 @@ struct FractalViewer {
 impl FractalViewer {
     fn new(cx: &mut Context<Self>) -> Self {
         let size = 64.0;
-        let quads = Self::create_fractal(size);
+        let quads = Self::create_fractal(size, 0.0);
 
         cx.spawn(|this, mut cx| async move {
             loop {
@@ -49,8 +49,8 @@ impl FractalViewer {
         Self { quads, size }
     }
 
-    fn create_fractal(size: f32) -> Vec<gpui::PaintQuad> {
-        circular_sierpinski2::carpet(point(px(256.), px(256.)), px(size), 4)
+    fn create_fractal(size: f32, angle: f32) -> Vec<gpui::PaintQuad> {
+        circular_sierpinski2::carpet(point(px(256.), px(256.)), px(size), 4, angle)
     }
 
     fn grow(&mut self, cx: &mut Context<Self>) {
@@ -58,7 +58,8 @@ impl FractalViewer {
         if self.size > 1024.0 {
             self.size = 8.0;
         }
-        self.quads = Self::create_fractal(self.size);
+        let angle = (self.size / 256.0) % 360.0;
+        self.quads = Self::create_fractal(self.size, angle);
         cx.notify();
     }
 }
@@ -68,7 +69,7 @@ impl Render for FractalViewer {
         let quads = self.quads.clone();
 
         div()
-            .bg(gpui::white())
+            .bg(gpui::black())
             .size_full()
             .child(render_fractal(quads, window, cx))
     }

@@ -3,7 +3,7 @@
 use gpui::{point, px, Path, PathBuilder, Pixels, Point};
 use std::f32::consts::PI;
 
-mod shapes2 {
+pub mod shapes2 {
     use gpui::{Bounds, Corners, Edges, Hsla, Size};
 
     use super::*;
@@ -35,7 +35,7 @@ mod shapes2 {
 
     impl Circle {
         pub fn new(radius: Pixels, position: Point<Pixels>) -> Self {
-            let stroke: Stroke = gpui::black().into();
+            let stroke: Stroke = gpui::white().into();
             let fill: gpui::Background = gpui::transparent_black().into();
 
             Circle {
@@ -70,8 +70,8 @@ mod shapes2 {
         }
 
         pub fn quad(&self) -> gpui::PaintQuad {
-            let half_size = self.size / 2.0;
-            let center = point(self.position.x + half_size, self.position.y + half_size);
+            // let half_size = self.size / 2.0;
+            let center = point(self.position.x, self.position.y);
 
             let bounds = Bounds::centered_at(
                 center,
@@ -83,10 +83,11 @@ mod shapes2 {
             let background = self.fill;
             let border_color = self.stroke.color;
             let border_width = self.stroke.width;
+            let corner_radii = Corners::all(self.size / 2.0);
 
             gpui::PaintQuad {
                 bounds,
-                corner_radii: Corners::all(px(2.)),
+                corner_radii,
                 background,
                 border_widths: Edges::all(border_width),
                 border_color,
@@ -98,34 +99,40 @@ mod shapes2 {
 pub mod circular_sierpinski2 {
     use super::*;
 
-    pub fn carpet(center: Point<Pixels>, radius: Pixels, depth: u32) -> Vec<gpui::PaintQuad> {
-        recursive(center, radius, depth)
+    pub fn carpet(
+        center: Point<Pixels>,
+        radius: Pixels,
+        depth: u32,
+        angle: f32,
+    ) -> Vec<gpui::PaintQuad> {
+        recursive(center, radius, depth, angle)
     }
 
-    fn recursive(center: Point<Pixels>, radius: Pixels, depth: u32) -> Vec<gpui::PaintQuad> {
+    fn recursive(
+        center: Point<Pixels>,
+        radius: Pixels,
+        depth: u32,
+        angle: f32,
+    ) -> Vec<gpui::PaintQuad> {
         let mut quads = Vec::new();
 
         if depth == 0 {
             return quads;
         }
 
-        quads.push(
-            shapes2::circle(radius, center)
-                .fill(gpui::red().opacity(0.2))
-                .quad(),
-        );
+        quads.push(shapes2::circle(radius, center).quad());
 
-        let inner_radius = radius * 1.0 / 3.0;
+        let inner_radius = radius / 3.0;
         let offset = radius * 2.0 / 3.0;
 
         for i in 0..8 {
-            let angle = i as f32 * PI / 4.0;
-            let x = center.x + px(offset.0 * angle.cos());
-            let y = center.y + px(offset.0 * angle.sin());
-            quads.extend(recursive(Point { x, y }, inner_radius, depth - 1));
+            let circle_angle = i as f32 * PI / 4.0 + angle;
+            let x = center.x + px(offset.0 * circle_angle.cos());
+            let y = center.y + px(offset.0 * circle_angle.sin());
+            quads.extend(recursive(Point { x, y }, inner_radius, depth - 1, angle));
         }
 
-        quads.extend(recursive(center, inner_radius, depth - 1));
+        quads.extend(recursive(center, inner_radius, depth - 1, angle));
 
         quads
     }
