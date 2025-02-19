@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-use gpui::{point, px, Path, PathBuilder, Pixels, Point};
+use gpui::{point, px, Path, Pixels, Point};
 use std::f32::consts::PI;
 
-pub mod shapes2 {
-    use gpui::{Bounds, Corners, Edges, Hsla, Size};
+pub mod shapes {
+    use gpui::{Bounds, Corners, Edges, Hsla, Size, Window};
 
     use super::*;
 
@@ -26,10 +26,40 @@ pub mod shapes2 {
         Circle::new(radius.into(), position)
     }
 
+    pub fn pixel(position: Point<Pixels>) -> Pixel {
+        Pixel::new(position)
+    }
+
+    pub fn line(start: Point<Pixels>, end: Point<Pixels>) -> Line {
+        Line::new(start, end)
+    }
+
+    pub fn triangle(p1: Point<Pixels>, p2: Point<Pixels>, p3: Point<Pixels>) -> Triangle {
+        Triangle::new(p1, p2, p3)
+    }
+
     pub struct Circle {
         fill: gpui::Background,
         position: Point<Pixels>,
         size: Pixels,
+        stroke: Stroke,
+    }
+
+    pub struct Pixel {
+        position: Point<Pixels>,
+        color: gpui::Hsla,
+    }
+
+    pub struct Line {
+        start: Point<Pixels>,
+        end: Point<Pixels>,
+        stroke: Stroke,
+    }
+
+    pub struct Triangle {
+        p1: Point<Pixels>,
+        p2: Point<Pixels>,
+        p3: Point<Pixels>,
         stroke: Stroke,
     }
 
@@ -70,7 +100,6 @@ pub mod shapes2 {
         }
 
         pub fn quad(&self) -> gpui::PaintQuad {
-            // let half_size = self.size / 2.0;
             let center = point(self.position.x, self.position.y);
 
             let bounds = Bounds::centered_at(
@@ -93,6 +122,132 @@ pub mod shapes2 {
                 border_color,
             }
         }
+    }
+
+    impl Pixel {
+        pub fn new(position: Point<Pixels>) -> Self {
+            Pixel {
+                position,
+                color: gpui::white(),
+            }
+        }
+
+        pub fn color(mut self, color: impl Into<gpui::Hsla>) -> Self {
+            self.color = color.into();
+            self
+        }
+
+        pub fn quad(&self) -> gpui::PaintQuad {
+            let bounds = Bounds::from_corner_and_size(
+                gpui::Corner::TopLeft,
+                self.position,
+                Size {
+                    width: px(1.),
+                    height: px(1.),
+                },
+            );
+            let background = self.color.into();
+
+            gpui::PaintQuad {
+                bounds,
+                corner_radii: Corners::default(),
+                background,
+                border_widths: Edges::default(),
+                border_color: gpui::transparent_black(),
+            }
+        }
+    }
+
+    impl Line {
+        pub fn new(start: Point<Pixels>, end: Point<Pixels>) -> Self {
+            Line {
+                start,
+                end,
+                stroke: gpui::white().into(),
+            }
+        }
+
+        pub fn stroke_width(mut self, width: impl Into<Pixels>) -> Self {
+            self.stroke.width = width.into();
+            self
+        }
+
+        pub fn stroke_color(mut self, color: impl Into<gpui::Hsla>) -> Self {
+            self.stroke.color = color.into();
+            self
+        }
+
+        pub fn paint(&self) -> (gpui::Path<Pixels>, gpui::Hsla) {
+            let mut path = Path::new(self.start);
+            path.line_to(self.end);
+            (path, self.stroke.color)
+        }
+    }
+
+    impl Triangle {
+        pub fn new(p1: Point<Pixels>, p2: Point<Pixels>, p3: Point<Pixels>) -> Self {
+            Triangle {
+                p1,
+                p2,
+                p3,
+                stroke: gpui::white().into(),
+            }
+        }
+
+        pub fn stroke_width(mut self, width: impl Into<Pixels>) -> Self {
+            self.stroke.width = width.into();
+            self
+        }
+
+        pub fn stroke_color(mut self, color: impl Into<gpui::Hsla>) -> Self {
+            self.stroke.color = color.into();
+            self
+        }
+
+        pub fn paint(&self) -> (gpui::Path<Pixels>, gpui::Hsla) {
+            let mut path = Path::new(self.p1);
+            path.line_to(self.p2);
+            path.line_to(self.p3);
+            path.line_to(self.p1);
+            (path, self.stroke.color)
+        }
+    }
+}
+
+pub mod julia_set {
+    use super::*;
+    use gpui::hsla;
+    use num_complex::Complex;
+
+    pub fn generate(
+        width: usize,
+        height: usize,
+        c: Complex<f32>,
+        max_iterations: u32,
+    ) -> Vec<gpui::PaintQuad> {
+        let mut quads = Vec::new();
+
+        for y in 0..height {
+            for x in 0..width {
+                let scaled_x = (x as f32 / width as f32) * 4.0 - 2.0;
+                let scaled_y = (y as f32 / height as f32) * 4.0 - 2.0;
+                let mut z = Complex::new(scaled_x, scaled_y);
+
+                let mut i = 0;
+                while i < max_iterations && z.norm() <= 2.0 {
+                    z = z * z + c;
+                    i += 1;
+                }
+
+                if i < max_iterations {
+                    let color = hsla((i as f32 / max_iterations as f32) * 360.0, 100.0, 50.0, 1.0);
+                    let pixel = shapes::pixel(point(px(x as f32), px(y as f32))).color(color);
+                    quads.push(pixel.quad());
+                }
+            }
+        }
+
+        quads
     }
 }
 
@@ -120,7 +275,7 @@ pub mod circular_sierpinski2 {
             return quads;
         }
 
-        quads.push(shapes2::circle(radius, center).quad());
+        quads.push(shapes::circle(radius, center).quad());
 
         let inner_radius = radius / 3.0;
         let offset = radius * 2.0 / 3.0;
@@ -138,48 +293,6 @@ pub mod circular_sierpinski2 {
     }
 }
 
-mod shapes {
-    use super::*;
-
-    pub fn circle(builder: &mut PathBuilder, center: Point<Pixels>, radius: Pixels, segments: u32) {
-        let angle_step = 2.0 * PI / segments as f32;
-
-        let start = Point {
-            x: center.x + radius,
-            y: center.y,
-        };
-        builder.move_to(start);
-
-        for i in 1..=segments {
-            let angle = i as f32 * angle_step;
-            let point = Point {
-                x: center.x + px(radius.0 * angle.cos()),
-                y: center.y + px(radius.0 * angle.sin()),
-            };
-            builder.line_to(point);
-        }
-
-        builder.close();
-    }
-
-    pub fn line(builder: &mut PathBuilder, start: Point<Pixels>, end: Point<Pixels>) {
-        builder.move_to(start);
-        builder.line_to(end);
-    }
-
-    pub fn triangle(
-        builder: &mut PathBuilder,
-        p1: Point<Pixels>,
-        p2: Point<Pixels>,
-        p3: Point<Pixels>,
-    ) {
-        builder.move_to(p1);
-        builder.line_to(p2);
-        builder.line_to(p3);
-        builder.close();
-    }
-}
-
 pub mod dragon {
     use super::*;
 
@@ -187,21 +300,21 @@ pub mod dragon {
         start: Point<Pixels>,
         end: Point<Pixels>,
         iterations: u32,
-    ) -> Option<Path<Pixels>> {
-        let mut builder = PathBuilder::stroke(px(1.));
-        recursive(&mut builder, start, end, iterations, true);
-        builder.build().ok()
+    ) -> Vec<(gpui::Path<Pixels>, gpui::Hsla)> {
+        let mut paths = Vec::new();
+        recursive(&mut paths, start, end, iterations, true);
+        paths
     }
 
     fn recursive(
-        builder: &mut PathBuilder,
+        paths: &mut Vec<(gpui::Path<Pixels>, gpui::Hsla)>,
         start: Point<Pixels>,
         end: Point<Pixels>,
         iterations: u32,
         is_right: bool,
     ) {
         if iterations == 0 {
-            shapes::line(builder, start, end);
+            paths.push(shapes::line(start, end).paint());
         } else {
             let mid = Point {
                 x: (start.x + end.x) / 2.0
@@ -209,8 +322,8 @@ pub mod dragon {
                 y: (start.y + end.y) / 2.0
                     + (start.x - end.x) / 2.0 * if is_right { -1.0 } else { 1.0 },
             };
-            recursive(builder, start, mid, iterations - 1, true);
-            recursive(builder, mid, end, iterations - 1, false);
+            recursive(paths, start, mid, iterations - 1, true);
+            recursive(paths, mid, end, iterations - 1, false);
         }
     }
 }
@@ -222,24 +335,29 @@ pub mod koch {
         start: Point<Pixels>,
         side_length: f32,
         iterations: u32,
-    ) -> Option<Path<Pixels>> {
+    ) -> Vec<(gpui::Path<Pixels>, gpui::Hsla)> {
+        let mut paths = Vec::new();
         let height = side_length * 3f32.sqrt() / 2.0;
-        let mut builder = PathBuilder::stroke(px(1.));
 
         let p1 = start;
         let p2 = start + point(px(side_length), px(0.0));
         let p3 = start + point(px(side_length / 2.0), px(height));
 
-        side(&mut builder, p1, p2, iterations);
-        side(&mut builder, p2, p3, iterations);
-        side(&mut builder, p3, p1, iterations);
+        side(&mut paths, p1, p2, iterations);
+        side(&mut paths, p2, p3, iterations);
+        side(&mut paths, p3, p1, iterations);
 
-        builder.build().ok()
+        paths
     }
 
-    fn side(builder: &mut PathBuilder, start: Point<Pixels>, end: Point<Pixels>, iterations: u32) {
+    fn side(
+        paths: &mut Vec<(gpui::Path<Pixels>, gpui::Hsla)>,
+        start: Point<Pixels>,
+        end: Point<Pixels>,
+        iterations: u32,
+    ) {
         if iterations == 0 {
-            shapes::line(builder, start, end);
+            paths.push(shapes::line(start, end).paint());
         } else {
             let delta = end - start;
             let third = Point {
@@ -264,10 +382,10 @@ pub mod koch {
                 };
             let p5 = end;
 
-            side(builder, p1, p2, iterations - 1);
-            side(builder, p2, p3, iterations - 1);
-            side(builder, p3, p4, iterations - 1);
-            side(builder, p4, p5, iterations - 1);
+            side(paths, p1, p2, iterations - 1);
+            side(paths, p2, p3, iterations - 1);
+            side(paths, p3, p4, iterations - 1);
+            side(paths, p4, p5, iterations - 1);
         }
     }
 }
@@ -279,14 +397,14 @@ pub mod sierpinski {
         start: Point<Pixels>,
         side_length: f32,
         iterations: u32,
-    ) -> Option<Path<Pixels>> {
-        let mut builder = PathBuilder::stroke(px(1.));
-        recursive(&mut builder, start, side_length, iterations);
-        builder.build().ok()
+    ) -> Vec<(gpui::Path<Pixels>, gpui::Hsla)> {
+        let mut paths = Vec::new();
+        recursive(&mut paths, start, side_length, iterations);
+        paths
     }
 
     fn recursive(
-        builder: &mut PathBuilder,
+        paths: &mut Vec<(gpui::Path<Pixels>, gpui::Hsla)>,
         start: Point<Pixels>,
         side_length: f32,
         iterations: u32,
@@ -296,18 +414,18 @@ pub mod sierpinski {
             let p1 = start;
             let p2 = start + point(px(side_length), px(0.0));
             let p3 = start + point(px(side_length / 2.0), px(height));
-            shapes::triangle(builder, p1, p2, p3);
+            paths.push(shapes::triangle(p1, p2, p3).paint());
         } else {
             let new_side = side_length / 2.0;
-            recursive(builder, start, new_side, iterations - 1);
+            recursive(paths, start, new_side, iterations - 1);
             recursive(
-                builder,
+                paths,
                 start + point(px(new_side), px(0.0)),
                 new_side,
                 iterations - 1,
             );
             recursive(
-                builder,
+                paths,
                 start + point(px(new_side / 2.0), px(new_side * 3f32.sqrt() / 2.0)),
                 new_side,
                 iterations - 1,
@@ -324,14 +442,14 @@ pub mod pythagoras {
         size: f32,
         angle: f32,
         iterations: u32,
-    ) -> Option<Path<Pixels>> {
-        let mut builder = PathBuilder::stroke(px(1.));
-        recursive(&mut builder, start, size, angle, iterations);
-        builder.build().ok()
+    ) -> Vec<(gpui::Path<Pixels>, gpui::Hsla)> {
+        let mut paths = Vec::new();
+        recursive(&mut paths, start, size, angle, iterations);
+        paths
     }
 
     fn recursive(
-        builder: &mut PathBuilder,
+        paths: &mut Vec<(gpui::Path<Pixels>, gpui::Hsla)>,
         start: Point<Pixels>,
         size: f32,
         angle: f32,
@@ -346,60 +464,13 @@ pub mod pythagoras {
             y: start.y - px(size * angle.sin()),
         };
 
-        shapes::line(builder, start, end);
+        paths.push(shapes::line(start, end).paint());
 
         let new_size = size / 2f32.sqrt();
         let new_angle1 = angle + PI / 4.0;
         let new_angle2 = angle - PI / 4.0;
 
-        recursive(builder, end, new_size, new_angle1, iterations - 1);
-        recursive(builder, end, new_size, new_angle2, iterations - 1);
-    }
-}
-
-pub mod circular_sierpinski {
-    use super::*;
-
-    pub fn carpet(
-        center: Point<Pixels>,
-        radius: Pixels,
-        depth: u32,
-        circle_segments: u32,
-    ) -> Option<Path<Pixels>> {
-        let mut builder = PathBuilder::stroke(px(1.));
-        recursive(&mut builder, center, radius, depth, circle_segments);
-        builder.build().ok()
-    }
-
-    fn recursive(
-        builder: &mut PathBuilder,
-        center: Point<Pixels>,
-        radius: Pixels,
-        depth: u32,
-        circle_segments: u32,
-    ) {
-        if depth == 0 {
-            return;
-        }
-
-        shapes::circle(builder, center, radius, circle_segments);
-
-        let inner_radius = radius * 1.0 / 3.0;
-        let offset = radius * 2.0 / 3.0;
-
-        for i in 0..8 {
-            let angle = i as f32 * PI / 4.0;
-            let x = center.x + px(offset.0 * angle.cos());
-            let y = center.y + px(offset.0 * angle.sin());
-            recursive(
-                builder,
-                Point { x, y },
-                inner_radius,
-                depth - 1,
-                circle_segments,
-            );
-        }
-
-        recursive(builder, center, inner_radius, depth - 1, circle_segments);
+        recursive(paths, end, new_size, new_angle1, iterations - 1);
+        recursive(paths, end, new_size, new_angle2, iterations - 1);
     }
 }

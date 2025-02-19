@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 gpui = { git = "https://github.com/zed-industries/zed" }
 lyon = { version = "1.0.1", features = ["extra"] }
+num-complex = "0.4.6"

@@ -1,16 +1,14 @@
-use std::time::Duration;
-
 use gpui::{
-    canvas, div, point, prelude::*, px, App, Application, Bounds, Context, Path, PathBuilder,
-    Pixels, Render, Size, Timer, TitlebarOptions, Window, WindowOptions,
+    canvas, div, point, prelude::*, px, App, Application, Bounds, Context, Pixels, Render, Size,
+    TitlebarOptions, Window, WindowOptions,
 };
+use num_complex::Complex;
 
 mod fractals;
 
-use fractals::*;
-
-fn render_fractal(
+fn render_canvas(
     quads: Vec<gpui::PaintQuad>,
+    paths: Vec<(gpui::Path<Pixels>, gpui::Hsla)>,
     _window: &mut Window,
     _cx: &mut App,
 ) -> impl IntoElement {
@@ -20,6 +18,9 @@ fn render_fractal(
             for quad in quads.iter() {
                 window.paint_quad(quad.clone());
             }
+            for (path, color) in paths.iter() {
+                window.paint_path(path.clone(), *color);
+            }
         },
     )
     .size_full()
@@ -27,51 +28,48 @@ fn render_fractal(
 
 struct FractalViewer {
     quads: Vec<gpui::PaintQuad>,
-    size: f32,
+    paths: Vec<(gpui::Path<Pixels>, gpui::Hsla)>,
+    c: Complex<f32>,
 }
 
 impl FractalViewer {
-    fn new(cx: &mut Context<Self>) -> Self {
-        let size = 64.0;
-        let quads = Self::create_fractal(size, 0.0);
+    fn new(_cx: &mut Context<Self>) -> Self {
+        let c = Complex::new(-0.4, 0.6);
+        let quads = vec![
+            fractals::shapes::circle(px(50.0), point(px(100.0), px(100.0))).quad(),
+            fractals::shapes::pixel(point(px(200.0), px(200.0)))
+                .color(gpui::red())
+                .quad(),
+        ];
+        let paths = vec![
+            fractals::shapes::line(point(px(50.0), px(50.0)), point(px(150.0), px(150.0))).paint(),
+            fractals::shapes::triangle(
+                point(px(300.0), px(300.0)),
+                point(px(350.0), px(300.0)),
+                point(px(325.0), px(350.0)),
+            )
+            .paint(),
+        ];
+        // let paths = fractals::pythagoras::tree(point(px(128.), px(128.)), 128., 0., 8);
 
-        cx.spawn(|this, mut cx| async move {
-            loop {
-                Timer::after(Duration::from_millis(8)).await;
-                this.update(&mut cx, |this, cx| {
-                    this.grow(cx);
-                })
-                .ok();
-            }
-        })
-        .detach();
-
-        Self { quads, size }
+        Self { quads, paths, c }
     }
 
-    fn create_fractal(size: f32, angle: f32) -> Vec<gpui::PaintQuad> {
-        circular_sierpinski2::carpet(point(px(256.), px(256.)), px(size), 4, angle)
-    }
-
-    fn grow(&mut self, cx: &mut Context<Self>) {
-        self.size += 1.0;
-        if self.size > 1024.0 {
-            self.size = 8.0;
-        }
-        let angle = (self.size / 256.0) % 360.0;
-        self.quads = Self::create_fractal(self.size, angle);
-        cx.notify();
-    }
+    // fn create_fractal(c: Complex<f32>) -> Vec<gpui::PaintQuad> {
+    //     julia_set::generate(512, 512, c, 25)
+    // }
+    //
 }
 
 impl Render for FractalViewer {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let quads = self.quads.clone();
+        let paths = self.paths.clone();
 
         div()
             .bg(gpui::black())
             .size_full()
-            .child(render_fractal(quads, window, cx))
+            .child(render_canvas(quads, paths, window, cx))
     }
 }
 
@@ -80,7 +78,7 @@ fn main() {
         cx.open_window(
             WindowOptions {
                 titlebar: Some(TitlebarOptions {
-                    title: Some("gpui: fractal viewer".into()),
+                    title: Some("gpui".into()),
                     ..Default::default()
                 }),
                 window_bounds: Some(gpui::WindowBounds::Windowed(Bounds::new(
