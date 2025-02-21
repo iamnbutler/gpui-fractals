@@ -39,7 +39,7 @@ impl FractalViewer {
     }
     fn update_epoch(&mut self, cx: &mut Context<Self>) {
         const START_EPOCH: u64 = 0;
-        const MAX_EPOCH: u64 = 160;
+        const MAX_EPOCH: u64 = 512;
         let mut max_cycles = 1;
 
         if self.epoch == MAX_EPOCH - 1 {
@@ -71,26 +71,35 @@ impl FractalViewer {
         let epoch = self.epoch as f32;
         let center_x = 384.0;
         let center_y = 384.0;
-        let radius = 128.0;
-        let num_points = 128;
+        let radius = 200.0;
+        let num_points = 16;
         let angle_step = 2.0 * PI / num_points as f32;
 
         self.generate_formula_points(
             |t| {
-                let angle = t * angle_step + (epoch as f32 / 75.0);
-                let x = center_x
-                    + radius * angle.cos() * (1.0 + 0.3 + (epoch / 128.0) * (3.0 * angle).sin());
-                let y = if epoch % 2.0 == 1.0 {
-                    center_y
-                        - radius * angle.sin() * (1.0 + 0.3 + (epoch / 256.0) * (3.0 * angle).sin())
-                } else {
-                    center_y
-                        + radius * angle.sin() * (1.0 + 0.3 + (epoch / 256.0) * (3.0 * angle).sin())
-                };
+                let mut angle = t * angle_step + (epoch as f32 / 128.0);
 
-                // Calculate color based on angle and epoch
-                let opacity = (0.2 + 1.0 - (32.0 / (epoch as f32))).clamp(0.0, 1.0);
-                let color = gpui::hsla(1.0, 100.0, 50.0, opacity);
+                // Rotate points on odd epochs
+                if epoch % 2.0 != 0.0 {
+                    angle += PI;
+                }
+
+                // Add some chaotic variation to the radius
+                let chaotic_factor = (epoch * t).sin() * 0.2;
+                let base_radius = radius * (1.0 + 0.5 * (epoch / 128.0).sin() + chaotic_factor);
+
+                // Apply a spiraling effect
+                let spiral_factor = (epoch / 32.0) * 0.1;
+                let x = center_x + base_radius * (angle + spiral_factor).cos();
+                let y = center_y + base_radius * (angle + spiral_factor).sin();
+
+                // Calculate color based on angle and epoch with more variation
+                let hue = (t + (epoch / 64.0).sin()) % 1.0;
+                let saturation =
+                    0.5 + 0.5 * ((epoch / MAX_EPOCH as f32).sin() * (t * 2.0 * PI).cos());
+                let lightness = 0.5 + 0.3 * ((epoch / 64.0).cos() * (t * 3.0 * PI).sin());
+
+                let color = gpui::hsla(hue, saturation, lightness, 1.0);
 
                 ColoredPoint {
                     position: point(px(x), px(y)),
@@ -100,6 +109,33 @@ impl FractalViewer {
             (0.0, num_points as f32),
             1.0,
         );
+
+        // Add lines casting from the radial shape
+        for i in 0..num_points {
+            let angle = i as f32 * angle_step + (epoch as f32 / 75.0);
+            let base_radius = radius * (1.0 + 0.5 * (epoch / 128.0).sin()); // Increased variation
+            let start_x = center_x + base_radius * angle.cos();
+            let start_y = center_y + base_radius * angle.sin();
+            let line_length = radius * (0.5 + 1.0 * (epoch / 64.0).cos()); // Greatly increased variation
+            let end_x = start_x + line_length * angle.cos();
+            let end_y = start_y + line_length * angle.sin();
+
+            for t in 0..4 {
+                let t = t as f32 / 20.0;
+                let x = start_x + t * (end_x - start_x);
+                let y = start_y + t * (end_y - start_y);
+
+                let hue = i as f32 / num_points as f32;
+                let saturation = 0.8;
+                let lightness = 0.5;
+                let opacity = (1.0 - t) * 0.8; // Increased opacity
+                let color = gpui::hsla(hue, saturation, lightness, opacity);
+
+                let pixel = shapes::pixel(point(px(x), px(y))).color(color);
+                self.temp_quads.push(pixel.quad());
+            }
+        }
+
         self.draw_formula();
         cx.notify();
     }
